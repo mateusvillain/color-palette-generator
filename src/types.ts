@@ -21,6 +21,7 @@ export interface PaletteConfig {
   baseColor: string
   manualHue: number
   manualChroma: number  // 0-100 normalized (LCH: ×1.0, OKLCH: ×0.004)
+  isNeutral?: boolean
 }
 
 export function createDefaultSettings(): GlobalSettings {
