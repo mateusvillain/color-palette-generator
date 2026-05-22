@@ -14,6 +14,7 @@ export interface ColorShade {
   hex: string
   contrastLight: number
   contrastDark: number
+  isAnchor?: boolean
 }
 
 // ── Easing Curves ─────────────────────────────────────────────────────────────
@@ -276,12 +277,14 @@ export function generatePalette(options: PaletteOptions): ColorShade[] {
   } = options
 
   let baseH: number
-  let baseC: number  // native chroma for the current mode
+  let baseC: number
+  let anchorL: number | null = null
 
   if (useBaseColor) {
     const lch = hexToColorLCH(baseColor, colorMode)
     baseH = lch.h
     baseC = lch.c
+    anchorL = lch.l
   } else {
     baseH = manualHue
     baseC = colorMode === 'lch' ? manualChroma : manualChroma * OKLCH_C_SCALE
@@ -290,11 +293,43 @@ export function generatePalette(options: PaletteOptions): ColorShade[] {
   const [minL, maxL] = lightnessRange
   const steps = shadeSteps(shadeCount)
 
-  return Array.from({ length: shadeCount }, (_, i) => {
-    const t = shadeCount === 1 ? 0.5 : i / (shadeCount - 1)
-    const tCurved = applyCurve(t, curve)
+  // Compute anchor index: shade step closest to the base color's natural lightness
+  let anchorIdx = -1
+  if (anchorL !== null) {
+    const range = maxL - minL
+    const t = range > 0 ? (maxL - anchorL) / range : 0.5
+    anchorIdx = Math.max(0, Math.min(shadeCount - 1, Math.round(t * (shadeCount - 1))))
+  }
 
-    const lNorm = maxL - tCurved * (maxL - minL)
+  return Array.from({ length: shadeCount }, (_, i) => {
+    // t used for hue shift and chroma dimming (position in full scale, 0=light, 1=dark)
+    const t = shadeCount === 1 ? 0.5 : i / (shadeCount - 1)
+
+    if (anchorIdx >= 0 && i === anchorIdx) {
+      const hex = baseColor
+      return {
+        index: steps[i],
+        hex,
+        contrastLight: contrastRatio(hex, lightContrastColor),
+        contrastDark: contrastRatio(hex, darkContrastColor),
+        isAnchor: true,
+      }
+    }
+
+    let lNorm: number
+    if (anchorIdx < 0) {
+      // Manual mode — uniform scale
+      lNorm = maxL - applyCurve(t, curve) * (maxL - minL)
+    } else if (i < anchorIdx) {
+      // Light segment: maxL → anchorL
+      const segT = anchorIdx > 0 ? i / anchorIdx : 0
+      lNorm = maxL - applyCurve(segT, curve) * (maxL - anchorL!)
+    } else {
+      // Dark segment: anchorL → minL
+      const remaining = shadeCount - 1 - anchorIdx
+      const segT = remaining > 0 ? (i - anchorIdx) / remaining : 1
+      lNorm = anchorL! - applyCurve(segT, curve) * (anchorL! - minL)
+    }
 
     const hueOffset = hueShift * (0.5 - t)
     const h = ((baseH + hueOffset) % 360 + 360) % 360
