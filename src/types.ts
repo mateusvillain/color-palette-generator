@@ -2,6 +2,8 @@ import type { ColorMode, CurveType } from './utils/color'
 
 export type { ColorMode }
 
+export type HarmonyMode = 'none' | 'complementary' | 'analogous' | 'triadic' | 'split-complementary'
+
 export interface GlobalSettings {
   colorMode: ColorMode
   shadeCount: number
