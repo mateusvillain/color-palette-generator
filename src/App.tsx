@@ -241,13 +241,46 @@ export default function App() {
             <ColorInput label="Dark" value={settings.darkContrastColor} onChange={v => patchSettings({ darkContrastColor: v })} />
           </SidebarSection>
 
-          <SidebarSection title="WCAG Levels">
-            {[
+          <SidebarSection title="Contrast Formula">
+            <div style={{ display: 'flex', gap: 6 }}>
+              {(['wcag', 'apca'] as const).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => patchSettings({ contrastMode: mode })}
+                  style={{
+                    flex: 1, padding: '7px 0', borderRadius: 8,
+                    border: `1.5px solid ${settings.contrastMode === mode ? 'var(--accent)' : 'var(--border)'}`,
+                    background: settings.contrastMode === mode ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'var(--bg)',
+                    color: settings.contrastMode === mode ? 'var(--accent)' : 'var(--text-secondary)',
+                    fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                    fontFamily: 'JetBrains Mono, monospace', letterSpacing: 0.5,
+                    transition: 'border-color 0.15s, background 0.15s, color 0.15s',
+                  }}
+                >
+                  {mode.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
+              {settings.contrastMode === 'apca'
+                ? 'APCA (WCAG 3 candidate). More accurate for real-world readability.'
+                : 'WCAG 2.1 standard. Widely required for compliance.'}
+            </p>
+          </SidebarSection>
+
+          <SidebarSection title={settings.contrastMode === 'apca' ? 'APCA Levels' : 'WCAG Levels'}>
+            {(settings.contrastMode === 'apca' ? [
+              { level: 'Lc90+', ratio: 'Body text',     color: '#4ade80' },
+              { level: 'Lc75+', ratio: 'Large text',    color: '#60a5fa' },
+              { level: 'Lc60+', ratio: 'UI components', color: '#fbbf24' },
+              { level: 'Lc45+', ratio: 'Non-text',      color: '#f97316' },
+              { level: 'Fail',  ratio: '< Lc45',        color: '#f87171' },
+            ] : [
               { level: 'AAA',      ratio: '≥ 7 : 1',   color: '#4ade80' },
               { level: 'AA',       ratio: '≥ 4.5 : 1', color: '#60a5fa' },
               { level: 'AA Large', ratio: '≥ 3 : 1',   color: '#fbbf24' },
               { level: 'Fail',     ratio: '< 3 : 1',   color: '#f87171' },
-            ].map(({ level, ratio, color }) => (
+            ]).map(({ level, ratio, color }) => (
               <div key={level} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
                 <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>{level}</span>
