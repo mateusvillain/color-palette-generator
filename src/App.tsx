@@ -31,6 +31,7 @@ function buildExportEntry(config: PaletteConfig, s: GlobalSettings): ExportEntry
       shadeCount: s.shadeCount,
       hueShift: s.hueShift,
       chromaScale: s.chromaScale,
+      chromaFalloff: s.chromaFalloff,
       lightnessRange: [s.lightnessMin, s.lightnessMax],
       curve: s.curve,
       lightContrastColor: s.lightContrastColor,
@@ -414,6 +415,7 @@ export default function App() {
           <SidebarSection title="Adjustments">
             <Slider label="Hue Shift" value={settings.hueShift} min={0} max={40} unit="°" onChange={v => patchSettings({ hueShift: v })} />
             <Slider label="Chroma Scale" value={settings.chromaScale} min={0.2} max={2} step={0.05} decimals={2} onChange={v => patchSettings({ chromaScale: v })} />
+            <Slider label="Chroma Falloff" value={settings.chromaFalloff} min={0.2} max={1.5} step={0.05} decimals={2} onChange={v => patchSettings({ chromaFalloff: v })} />
           </SidebarSection>
 
           <SidebarSection title="Lightness Curve">
