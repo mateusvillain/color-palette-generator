@@ -1,9 +1,19 @@
 import { useMemo, useState } from 'react'
 import type { PaletteConfig, GlobalSettings } from '../types'
-import { generatePalette, wcagLevel, apcaContrast, apcaLevel } from '../utils/color'
+import { generatePalette, wcagLevel, relativeLuminance, apcaContrast, apcaLevel } from '../utils/color'
 import type { ColorShade } from '../utils/color'
+import { simulateCVD } from '../utils/colorblind'
+import type { ColorblindMode } from '../utils/colorblind'
 import { Slider } from './Slider'
 import { UIPreview } from './UIPreview'
+
+// Flag adjacent shade pairs whose simulated luminance difference is negligible
+function hasPoorCvdContrast(hexA: string, hexB: string): boolean {
+  const la = relativeLuminance(hexA)
+  const lb = relativeLuminance(hexB)
+  const ratio = (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
+  return ratio < 1.5
+}
 
 const PRESETS = ['#3b82f6', '#8b5cf6', '#f43f5e', '#f59e0b', '#10b981', '#06b6d4', '#64748b']
 
@@ -22,12 +32,14 @@ const APCA_LEVEL_COLOR: Record<string, string> = {
   Fail: '#f87171',
 }
 
-function ShadeCell({ shade, lightContrastColor, darkContrastColor, contrastMode }: {
+function ShadeCell({ shade, lightContrastColor, darkContrastColor, contrastMode, displayHex }: {
   shade: ColorShade
   lightContrastColor: string
   darkContrastColor: string
   contrastMode: 'wcag' | 'apca'
+  displayHex?: string
 }) {
+  const bg = displayHex ?? shade.hex
   const textColor = shade.contrastLight >= shade.contrastDark ? lightContrastColor : darkContrastColor
 
   const badges = contrastMode === 'apca'
@@ -49,7 +61,7 @@ function ShadeCell({ shade, lightContrastColor, darkContrastColor, contrastMode 
       onClick={() => navigator.clipboard.writeText(shade.hex)}
       title={`${shade.index} · ${shade.hex.toUpperCase()}`}
       style={{
-        flex: 1, background: shade.hex,
+        flex: 1, background: bg,
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between',
         padding: '8px 3px', cursor: 'pointer', transition: 'flex 0.15s',
         minWidth: 0, overflow: 'hidden',
@@ -108,7 +120,15 @@ interface Props {
   canDelete: boolean
 }
 
+const CVD_LABELS: { mode: ColorblindMode; label: string }[] = [
+  { mode: 'normal',       label: 'Normal' },
+  { mode: 'deuteranopia', label: 'Deut' },
+  { mode: 'protanopia',   label: 'Prot' },
+  { mode: 'tritanopia',   label: 'Trit' },
+]
+
 export function PaletteCard({ config, globalSettings, onChange, onDelete, onExport, onAddNeutral, canDelete }: Props) {
+  const [cvdMode, setCvdMode] = useState<ColorblindMode>('normal')
   const [showPreview, setShowPreview] = useState(false)
   const [tintRatio, setTintRatio] = useState(0.10)
 
@@ -170,6 +190,24 @@ export function PaletteCard({ config, globalSettings, onChange, onDelete, onExpo
 
         <div style={{ flex: 1 }} />
 
+        <div style={{ display: 'flex', gap: 2, background: 'var(--surface-raised)', borderRadius: 6, padding: 2 }}>
+          {CVD_LABELS.map(({ mode, label }) => (
+            <button
+              key={mode}
+              onClick={() => setCvdMode(mode)}
+              style={{
+                background: cvdMode === mode ? 'var(--surface)' : 'none',
+                border: 'none', borderRadius: 5, padding: '3px 7px', cursor: 'pointer',
+                fontSize: 10, fontWeight: 600,
+                color: cvdMode === mode ? 'var(--text)' : 'var(--text-muted)',
+                boxShadow: cvdMode === mode ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                transition: 'background 0.15s',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         {config.useBaseColor && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -266,10 +304,41 @@ export function PaletteCard({ config, globalSettings, onChange, onDelete, onExpo
             shade={shade}
             lightContrastColor={globalSettings.lightContrastColor}
             darkContrastColor={globalSettings.darkContrastColor}
+            displayHex={cvdMode !== 'normal' ? simulateCVD(shade.hex, cvdMode) : undefined}
             contrastMode={globalSettings.contrastMode}
           />
         ))}
       </div>
+
+      {/* ── CVD comparison strip ── */}
+      {cvdMode !== 'normal' && (() => {
+        const simHexes = palette.map(s => simulateCVD(s.hex, cvdMode))
+        return (
+          <div style={{ borderTop: '1px solid var(--border)' }}>
+            <div style={{ padding: '4px 14px 2px', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.7 }}>
+                Original
+              </span>
+            </div>
+            <div style={{ display: 'flex', height: 28 }}>
+              {palette.map((shade, i) => {
+                const poor = i < palette.length - 1 && hasPoorCvdContrast(simHexes[i], simHexes[i + 1])
+                return (
+                  <div key={shade.index} style={{ flex: 1, background: shade.hex, position: 'relative' }}>
+                    {poor && (
+                      <div title="Low contrast with next shade under this CVD mode" style={{
+                        position: 'absolute', top: 4, right: 2,
+                        width: 6, height: 6, borderRadius: '50%', background: '#f87171',
+                        border: '1px solid rgba(255,255,255,0.6)',
+                      }} />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── UI Preview ── */}
       {showPreview && <UIPreview shades={palette} name={config.name} />}
