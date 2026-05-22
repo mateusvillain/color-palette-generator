@@ -83,10 +83,11 @@ interface Props {
   onChange: (updates: Partial<PaletteConfig>) => void
   onDelete: () => void
   onExport: () => void
+  onAddNeutral: () => void
   canDelete: boolean
 }
 
-export function PaletteCard({ config, globalSettings, onChange, onDelete, onExport, canDelete }: Props) {
+export function PaletteCard({ config, globalSettings, onChange, onDelete, onExport, onAddNeutral, canDelete }: Props) {
   const palette = useMemo(() => generatePalette({
     colorMode: globalSettings.colorMode,
     useBaseColor: config.useBaseColor,
@@ -138,6 +139,11 @@ export function PaletteCard({ config, globalSettings, onChange, onDelete, onExpo
 
         <div style={{ flex: 1 }} />
 
+        {config.useBaseColor && (
+          <button onClick={onAddNeutral} title="Add tinted neutral derived from this color" style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
+            + Neutral
+          </button>
+        )}
         <button onClick={onExport} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
           Export
         </button>
