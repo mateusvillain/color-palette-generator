@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { PaletteConfig, GlobalSettings } from '../types'
-import { generatePalette, wcagLevel, relativeLuminance, apcaContrast, apcaLevel } from '../utils/color'
+import { generatePalette, hexToColorLCH, wcagLevel, relativeLuminance, apcaContrast, apcaLevel } from '../utils/color'
 import type { ColorShade } from '../utils/color'
 import { simulateCVD } from '../utils/colorblind'
 import type { ColorblindMode } from '../utils/colorblind'
@@ -218,7 +218,7 @@ export function PaletteCard({ config, globalSettings, onChange, onDelete, onExpo
         {config.useBaseColor && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>Tint</span>
+              <span style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>Neutral tint</span>
               <input
                 type="range"
                 min={0} max={0.25} step={0.01}
@@ -256,7 +256,20 @@ export function PaletteCard({ config, globalSettings, onChange, onDelete, onExpo
         flexWrap: 'wrap',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Toggle checked={config.useBaseColor} onChange={v => onChange({ useBaseColor: v })} />
+          <Toggle checked={config.useBaseColor} onChange={v => {
+            if (!v) {
+              // Carry the current baseColor's hue/chroma into manual mode so the palette doesn't shift
+              const { h, c } = hexToColorLCH(config.baseColor, globalSettings.colorMode)
+              const manualChroma = globalSettings.colorMode === 'oklch' ? c / 0.004 : c
+              onChange({
+                useBaseColor: false,
+                manualHue: Math.round(h),
+                manualChroma: Math.max(0, Math.min(100, Math.round(manualChroma))),
+              })
+            } else {
+              onChange({ useBaseColor: true })
+            }
+          }} />
           <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.7, whiteSpace: 'nowrap' }}>
             Base color
           </span>
