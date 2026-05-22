@@ -59,19 +59,26 @@ function ShadeCell({ shade, lightContrastColor, darkContrastColor, contrastMode,
   return (
     <div
       onClick={() => navigator.clipboard.writeText(shade.hex)}
-      title={`${shade.index} · ${shade.hex.toUpperCase()}`}
+      title={shade.isAnchor ? `${shade.index} · ${shade.hex.toUpperCase()} · anchor` : `${shade.index} · ${shade.hex.toUpperCase()}`}
       style={{
         flex: 1, background: bg,
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between',
         padding: '8px 3px', cursor: 'pointer', transition: 'flex 0.15s',
         minWidth: 0, overflow: 'hidden',
+        outline: shade.isAnchor ? `2px solid ${textColor}` : 'none',
+        outlineOffset: -2,
       }}
       onMouseEnter={e => (e.currentTarget.style.flex = '1.6')}
       onMouseLeave={e => (e.currentTarget.style.flex = '1')}
     >
-      <span style={{ color: textColor, fontSize: 11, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', opacity: 0.7, letterSpacing: 0.3 }}>
-        {shade.index}
-      </span>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+        <span style={{ color: textColor, fontSize: 11, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace', opacity: 0.7, letterSpacing: 0.3 }}>
+          {shade.index}
+        </span>
+        {shade.isAnchor && (
+          <div style={{ width: 5, height: 5, borderRadius: '50%', background: textColor, opacity: 0.6 }} />
+        )}
+      </div>
       <span style={{ color: textColor, fontSize: 11, fontFamily: 'JetBrains Mono, monospace', opacity: 0.85, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center', padding: '0 4px' }}>
         {shade.hex.toUpperCase()}
       </span>
