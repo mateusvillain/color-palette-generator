@@ -261,6 +261,7 @@ export interface PaletteOptions {
   shadeCount: number
   hueShift: number
   chromaScale: number
+  chromaFalloff: number  // exponent k in sin(π·L/100)^k; lower = more saturated extremes
   lightnessRange: [number, number]  // 0-100 for both modes
   curve: CurveType
   lightContrastColor: string
@@ -272,7 +273,7 @@ const OKLCH_C_SCALE = 0.004  // 100 → 0.4 (covers full sRGB gamut in OKLCH)
 export function generatePalette(options: PaletteOptions): ColorShade[] {
   const {
     colorMode, useBaseColor, baseColor, manualHue, manualChroma,
-    shadeCount, hueShift, chromaScale, lightnessRange, curve,
+    shadeCount, hueShift, chromaScale, chromaFalloff, lightnessRange, curve,
     lightContrastColor, darkContrastColor,
   } = options
 
@@ -338,8 +339,10 @@ export function generatePalette(options: PaletteOptions): ColorShade[] {
     // 0 at L=0/100. Tracking L (not shade index) keeps the falloff aligned
     // with where chroma is actually achievable in sRGB — fewer extreme shades
     // hit the gamut boundary, so palettes look consistent across hues.
+    // chromaFalloff controls how aggressive the fade is (k=0.5 default;
+    // lower = more saturated extremes, higher = more pastel extremes).
     const l01 = Math.max(0, Math.min(1, lNorm / 100))
-    const chromaDim = Math.pow(Math.sin(Math.PI * l01), 0.5)
+    const chromaDim = Math.pow(Math.sin(Math.PI * l01), chromaFalloff)
     const c = Math.max(0, baseC * chromaScale * chromaDim)
 
     const hex = gamutMap(lNorm, c, h, colorMode)

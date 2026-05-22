@@ -12,6 +12,7 @@ export interface GlobalSettings {
   shadeCount: number
   hueShift: number
   chromaScale: number
+  chromaFalloff: number
   lightnessMin: number
   lightnessMax: number
   curve: CurveType
@@ -37,6 +38,7 @@ export function createDefaultSettings(): GlobalSettings {
     shadeCount: 6,
     hueShift: 10,
     chromaScale: 1.0,
+    chromaFalloff: 0.5,
     lightnessMin: 8,
     lightnessMax: 97,
     curve: 'ease-in-out',

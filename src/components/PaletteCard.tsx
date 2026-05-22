@@ -148,6 +148,7 @@ export function PaletteCard({ config, globalSettings, onChange, onDelete, onExpo
     shadeCount: globalSettings.shadeCount,
     hueShift: globalSettings.hueShift,
     chromaScale: globalSettings.chromaScale,
+    chromaFalloff: globalSettings.chromaFalloff,
     lightnessRange: [globalSettings.lightnessMin, globalSettings.lightnessMax],
     curve: globalSettings.curve,
     lightContrastColor: globalSettings.lightContrastColor,

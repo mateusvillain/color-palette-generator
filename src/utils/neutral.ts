@@ -34,6 +34,7 @@ export function generateNeutralPalette(
     shadeCount: settings.shadeCount,
     hueShift: 0,                             // no hue shift on neutrals
     chromaScale: settings.chromaScale,
+    chromaFalloff: settings.chromaFalloff,
     lightnessRange: [settings.lightnessMin, settings.lightnessMax],
     curve: settings.curve,
     lightContrastColor: settings.lightContrastColor,
