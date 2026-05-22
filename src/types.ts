@@ -2,8 +2,13 @@ import type { ColorMode, CurveType } from './utils/color'
 
 export type { ColorMode }
 
+export type ContrastMode = 'wcag' | 'apca'
+export type HarmonyMode = 'none' | 'complementary' | 'analogous' | 'triadic' | 'split-complementary'
+
 export interface GlobalSettings {
   colorMode: ColorMode
+  harmonyMode: HarmonyMode
+  contrastMode: ContrastMode
   shadeCount: number
   hueShift: number
   chromaScale: number
@@ -21,11 +26,14 @@ export interface PaletteConfig {
   baseColor: string
   manualHue: number
   manualChroma: number  // 0-100 normalized (LCH: ×1.0, OKLCH: ×0.004)
+  isNeutral?: boolean
 }
 
 export function createDefaultSettings(): GlobalSettings {
   return {
     colorMode: 'oklch',
+    harmonyMode: 'none',
+    contrastMode: 'wcag',
     shadeCount: 6,
     hueShift: 10,
     chromaScale: 1.0,

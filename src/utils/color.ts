@@ -199,6 +199,38 @@ export function wcagLevel(ratio: number): 'AAA' | 'AA' | 'AA Large' | 'Fail' {
   return 'Fail'
 }
 
+// ── APCA Contrast (WCAG 3 candidate) ─────────────────────────────────────────
+// Based on the APCA-W3 0.0.98G formula by Myndex Research.
+// Returns a signed Lc value: positive = dark text on light bg, negative = light text on dark bg.
+// Typical thresholds: |Lc| ≥ 90 → body text, ≥ 75 → large text, ≥ 60 → UI components.
+
+function apcaSoftClamp(y: number): number {
+  return y >= 0.022 ? y : y + Math.pow(0.022 - y, 1.414)
+}
+
+export function apcaContrast(textHex: string, bgHex: string): number {
+  const yText = apcaSoftClamp(relativeLuminance(textHex))
+  const yBg   = apcaSoftClamp(relativeLuminance(bgHex))
+
+  const darkOverLight = yBg >= yText
+  const Lc = darkOverLight
+    ? (Math.pow(yBg, 0.56) - Math.pow(yText, 0.57)) * 1.14
+    : (Math.pow(yBg, 0.65) - Math.pow(yText, 0.62)) * 1.14
+
+  return parseFloat((Math.abs(Lc) < 0.1 ? 0 : Lc * 100).toFixed(1))
+}
+
+export type ApcaLevel = 'Lc90+' | 'Lc75+' | 'Lc60+' | 'Lc45+' | 'Fail'
+
+export function apcaLevel(lc: number): ApcaLevel {
+  const abs = Math.abs(lc)
+  if (abs >= 90) return 'Lc90+'
+  if (abs >= 75) return 'Lc75+'
+  if (abs >= 60) return 'Lc60+'
+  if (abs >= 45) return 'Lc45+'
+  return 'Fail'
+}
+
 // ── Shade Steps ───────────────────────────────────────────────────────────────
 
 function shadeSteps(count: number): number[] {
