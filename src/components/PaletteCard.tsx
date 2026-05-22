@@ -1,7 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { PaletteConfig, GlobalSettings } from '../types'
 import { generatePalette, wcagLevel } from '../utils/color'
 import type { ColorShade } from '../utils/color'
+import { simulateCVD } from '../utils/colorblind'
+import type { ColorblindMode } from '../utils/colorblind'
 import { Slider } from './Slider'
 
 const PRESETS = ['#3b82f6', '#8b5cf6', '#f43f5e', '#f59e0b', '#10b981', '#06b6d4', '#64748b']
@@ -13,11 +15,13 @@ const LEVEL_COLOR: Record<string, string> = {
   Fail: '#f87171',
 }
 
-function ShadeCell({ shade, lightContrastColor, darkContrastColor }: {
+function ShadeCell({ shade, lightContrastColor, darkContrastColor, displayHex }: {
   shade: ColorShade
   lightContrastColor: string
   darkContrastColor: string
+  displayHex?: string
 }) {
+  const bg = displayHex ?? shade.hex
   const textColor = shade.contrastLight >= shade.contrastDark ? lightContrastColor : darkContrastColor
 
   return (
@@ -25,7 +29,7 @@ function ShadeCell({ shade, lightContrastColor, darkContrastColor }: {
       onClick={() => navigator.clipboard.writeText(shade.hex)}
       title={`${shade.index} · ${shade.hex.toUpperCase()}`}
       style={{
-        flex: 1, background: shade.hex,
+        flex: 1, background: bg,
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between',
         padding: '8px 3px', cursor: 'pointer', transition: 'flex 0.15s',
         minWidth: 0, overflow: 'hidden',
@@ -86,7 +90,16 @@ interface Props {
   canDelete: boolean
 }
 
+const CVD_LABELS: { mode: ColorblindMode; label: string }[] = [
+  { mode: 'normal',      label: 'Normal' },
+  { mode: 'deuteranopia', label: 'Deut' },
+  { mode: 'protanopia',   label: 'Prot' },
+  { mode: 'tritanopia',   label: 'Trit' },
+]
+
 export function PaletteCard({ config, globalSettings, onChange, onDelete, onExport, canDelete }: Props) {
+  const [cvdMode, setCvdMode] = useState<ColorblindMode>('normal')
+
   const palette = useMemo(() => generatePalette({
     colorMode: globalSettings.colorMode,
     useBaseColor: config.useBaseColor,
@@ -138,6 +151,24 @@ export function PaletteCard({ config, globalSettings, onChange, onDelete, onExpo
 
         <div style={{ flex: 1 }} />
 
+        <div style={{ display: 'flex', gap: 2, background: 'var(--surface-raised)', borderRadius: 6, padding: 2 }}>
+          {CVD_LABELS.map(({ mode, label }) => (
+            <button
+              key={mode}
+              onClick={() => setCvdMode(mode)}
+              style={{
+                background: cvdMode === mode ? 'var(--surface)' : 'none',
+                border: 'none', borderRadius: 5, padding: '3px 7px', cursor: 'pointer',
+                fontSize: 10, fontWeight: 600,
+                color: cvdMode === mode ? 'var(--text)' : 'var(--text-muted)',
+                boxShadow: cvdMode === mode ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                transition: 'background 0.15s',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <button onClick={onExport} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
           Export
         </button>
@@ -211,6 +242,7 @@ export function PaletteCard({ config, globalSettings, onChange, onDelete, onExpo
             shade={shade}
             lightContrastColor={globalSettings.lightContrastColor}
             darkContrastColor={globalSettings.darkContrastColor}
+            displayHex={cvdMode !== 'normal' ? simulateCVD(shade.hex, cvdMode) : undefined}
           />
         ))}
       </div>
