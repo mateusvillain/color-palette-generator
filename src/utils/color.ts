@@ -334,8 +334,12 @@ export function generatePalette(options: PaletteOptions): ColorShade[] {
     const hueOffset = hueShift * (0.5 - t)
     const h = ((baseH + hueOffset) % 360 + 360) % 360
 
-    // Chroma dims slightly at very light and dark extremes
-    const chromaDim = 1 - Math.pow(Math.abs(t - 0.5) * 1.4, 2) * 0.35
+    // Lightness-based chroma envelope: peaks at L=50, fades smoothly toward
+    // 0 at L=0/100. Tracking L (not shade index) keeps the falloff aligned
+    // with where chroma is actually achievable in sRGB — fewer extreme shades
+    // hit the gamut boundary, so palettes look consistent across hues.
+    const l01 = Math.max(0, Math.min(1, lNorm / 100))
+    const chromaDim = Math.pow(Math.sin(Math.PI * l01), 0.5)
     const c = Math.max(0, baseC * chromaScale * chromaDim)
 
     const hex = gamutMap(lNorm, c, h, colorMode)
