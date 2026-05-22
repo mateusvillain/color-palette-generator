@@ -1,24 +1,48 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { PaletteConfig, GlobalSettings } from '../types'
-import { generatePalette, wcagLevel } from '../utils/color'
+import { generatePalette, wcagLevel, apcaContrast, apcaLevel } from '../utils/color'
 import type { ColorShade } from '../utils/color'
 import { Slider } from './Slider'
+import { UIPreview } from './UIPreview'
 
 const PRESETS = ['#3b82f6', '#8b5cf6', '#f43f5e', '#f59e0b', '#10b981', '#06b6d4', '#64748b']
 
-const LEVEL_COLOR: Record<string, string> = {
+const WCAG_LEVEL_COLOR: Record<string, string> = {
   AAA: '#4ade80',
   AA: '#60a5fa',
   'AA Large': '#fbbf24',
   Fail: '#f87171',
 }
 
-function ShadeCell({ shade, lightContrastColor, darkContrastColor }: {
+const APCA_LEVEL_COLOR: Record<string, string> = {
+  'Lc90+': '#4ade80',
+  'Lc75+': '#60a5fa',
+  'Lc60+': '#fbbf24',
+  'Lc45+': '#f97316',
+  Fail: '#f87171',
+}
+
+function ShadeCell({ shade, lightContrastColor, darkContrastColor, contrastMode }: {
   shade: ColorShade
   lightContrastColor: string
   darkContrastColor: string
+  contrastMode: 'wcag' | 'apca'
 }) {
   const textColor = shade.contrastLight >= shade.contrastDark ? lightContrastColor : darkContrastColor
+
+  const badges = contrastMode === 'apca'
+    ? [
+        { value: apcaContrast(textColor === lightContrastColor ? lightContrastColor : darkContrastColor, shade.hex), bg: lightContrastColor },
+        { value: apcaContrast(textColor === lightContrastColor ? lightContrastColor : darkContrastColor, shade.hex), bg: darkContrastColor },
+      ].map((_, i) => {
+        const bg = i === 0 ? lightContrastColor : darkContrastColor
+        const lc = apcaContrast(shade.hex, bg)
+        return { label: Math.abs(lc).toFixed(0), dotColor: APCA_LEVEL_COLOR[apcaLevel(lc)], bg }
+      })
+    : [
+        { label: shade.contrastLight.toFixed(1), dotColor: WCAG_LEVEL_COLOR[wcagLevel(shade.contrastLight)], bg: lightContrastColor },
+        { label: shade.contrastDark.toFixed(1),  dotColor: WCAG_LEVEL_COLOR[wcagLevel(shade.contrastDark)],  bg: darkContrastColor },
+      ]
 
   return (
     <div
@@ -41,15 +65,12 @@ function ShadeCell({ shade, lightContrastColor, darkContrastColor }: {
       </span>
       {/* Contrast badges — horizontal */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', overflow: 'hidden', padding: '0 4px' }}>
-        {[
-          { cr: shade.contrastLight, bg: lightContrastColor },
-          { cr: shade.contrastDark, bg: darkContrastColor },
-        ].map(({ cr, bg }, i) => (
+        {badges.map(({ label, dotColor, bg }, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
             <div style={{ width: 6, height: 6, borderRadius: 2, background: bg, border: '0.5px solid rgba(128,128,128,0.35)', flexShrink: 0 }} />
-            <div style={{ width: 5, height: 5, borderRadius: '50%', background: LEVEL_COLOR[wcagLevel(cr)], flexShrink: 0 }} />
+            <div style={{ width: 5, height: 5, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
             <span style={{ color: textColor, fontSize: 10, fontFamily: 'JetBrains Mono, monospace', opacity: 0.9, whiteSpace: 'nowrap' }}>
-              {cr.toFixed(1)}
+              {label}
             </span>
           </div>
         ))}
@@ -83,10 +104,14 @@ interface Props {
   onChange: (updates: Partial<PaletteConfig>) => void
   onDelete: () => void
   onExport: () => void
+  onAddNeutral: (tintRatio: number) => void
   canDelete: boolean
 }
 
-export function PaletteCard({ config, globalSettings, onChange, onDelete, onExport, canDelete }: Props) {
+export function PaletteCard({ config, globalSettings, onChange, onDelete, onExport, onAddNeutral, canDelete }: Props) {
+  const [showPreview, setShowPreview] = useState(false)
+  const [tintRatio, setTintRatio] = useState(0.10)
+
   const palette = useMemo(() => generatePalette({
     colorMode: globalSettings.colorMode,
     useBaseColor: config.useBaseColor,
@@ -116,6 +141,7 @@ export function PaletteCard({ config, globalSettings, onChange, onDelete, onExpo
       borderRadius: 12,
       overflow: 'hidden',
       borderTop: `3px solid ${midShade?.hex ?? 'var(--accent)'}`,
+      opacity: config.isNeutral ? 0.92 : 1,
     }}>
       {/* ── Card Header ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px' }}>
@@ -136,8 +162,37 @@ export function PaletteCard({ config, globalSettings, onChange, onDelete, onExpo
           onBlur={e => (e.currentTarget.style.background = 'none')}
         />
 
+        {config.isNeutral && (
+          <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 5px', letterSpacing: 0.5, textTransform: 'uppercase', flexShrink: 0 }}>
+            Neutral
+          </span>
+        )}
+
         <div style={{ flex: 1 }} />
 
+        {config.useBaseColor && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>Tint</span>
+              <input
+                type="range"
+                min={0} max={0.25} step={0.01}
+                value={tintRatio}
+                onChange={e => setTintRatio(parseFloat(e.target.value))}
+                style={{ width: 52, height: 4, accentColor: 'var(--accent)' }}
+              />
+            </div>
+            <button onClick={() => onAddNeutral(tintRatio)} title="Add tinted neutral derived from this color" style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+              + Neutral
+            </button>
+          </div>
+        )}
+        <button
+          onClick={() => setShowPreview(v => !v)}
+          style={{ background: showPreview ? 'var(--surface-raised)' : 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}
+        >
+          Preview
+        </button>
         <button onClick={onExport} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
           Export
         </button>
@@ -211,9 +266,13 @@ export function PaletteCard({ config, globalSettings, onChange, onDelete, onExpo
             shade={shade}
             lightContrastColor={globalSettings.lightContrastColor}
             darkContrastColor={globalSettings.darkContrastColor}
+            contrastMode={globalSettings.contrastMode}
           />
         ))}
       </div>
+
+      {/* ── UI Preview ── */}
+      {showPreview && <UIPreview shades={palette} name={config.name} />}
     </div>
   )
 }
