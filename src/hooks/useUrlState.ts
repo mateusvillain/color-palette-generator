@@ -2,18 +2,53 @@ import { useCallback, useEffect, useState } from 'react'
 import type { GlobalSettings, PaletteConfig } from '../types'
 import { createDefaultSettings, createDefaultPalette } from '../types'
 
+const CURRENT_VERSION = 1
+
 interface AppState {
   settings: GlobalSettings
   palettes: PaletteConfig[]
 }
 
+interface SerializedState {
+  v: number
+  settings: GlobalSettings
+  palettes: PaletteConfig[]
+}
+
 function encode(state: AppState): string {
-  return btoa(JSON.stringify(state))
+  const payload: SerializedState = { v: CURRENT_VERSION, ...state }
+  return btoa(JSON.stringify(payload))
 }
 
 function decode(raw: string): AppState | null {
   try {
-    return JSON.parse(atob(raw)) as AppState
+    const parsed = JSON.parse(atob(raw)) as Partial<SerializedState>
+
+    // Version guard: unknown future versions are discarded gracefully
+    if (parsed.v !== undefined && parsed.v > CURRENT_VERSION) return null
+
+    // Required fields validation
+    if (!parsed.settings || !Array.isArray(parsed.palettes) || parsed.palettes.length === 0) return null
+
+    // Field-level migration: fill in any settings keys added after the URL was created
+    const defaults = createDefaultSettings()
+    const migratedSettings = { ...defaults, ...parsed.settings } as GlobalSettings
+
+    // Ensure each palette has all required fields
+    const migratedPalettes = parsed.palettes
+      .filter((p): p is PaletteConfig => !!p && typeof p.id === 'string')
+      .map(p => ({
+        id: p.id,
+        name: p.name ?? 'Palette',
+        useBaseColor: p.useBaseColor ?? true,
+        baseColor: p.baseColor ?? '#3b82f6',
+        manualHue: p.manualHue ?? 220,
+        manualChroma: p.manualChroma ?? 60,
+      }))
+
+    if (migratedPalettes.length === 0) return null
+
+    return { settings: migratedSettings, palettes: migratedPalettes }
   } catch {
     return null
   }
