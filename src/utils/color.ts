@@ -205,8 +205,7 @@ export function wcagLevel(ratio: number): 'AAA' | 'AA' | 'AA Large' | 'Fail' {
 // Typical thresholds: |Lc| ≥ 90 → body text, ≥ 75 → large text, ≥ 60 → UI components.
 
 function apcaSoftClamp(y: number): number {
-  const exp = 0.56
-  return y >= 0.022 ? y : y + Math.pow(0.022 - y, exp)
+  return y >= 0.022 ? y : y + Math.pow(0.022 - y, 1.414)
 }
 
 export function apcaContrast(textHex: string, bgHex: string): number {
