@@ -41,11 +41,42 @@ function buildExportEntry(config: PaletteConfig, s: GlobalSettings): ExportEntry
 
 // ── Export Modal ──────────────────────────────────────────
 
+function toOklchCss(hex: string): string {
+  const { l, c, h } = hexToColorLCH(hex, 'oklch')
+  return `oklch(${(l / 100).toFixed(4)} ${(c).toFixed(4)} ${h.toFixed(2)})`
+}
+
+function toP3Css(hex: string): string {
+  // Convert hex → linear RGB → sRGB, then express in display-p3 space.
+  // display-p3 uses the same transfer function as sRGB but a wider primaries gamut.
+  // For colors already in sRGB gamut, the values are numerically identical to sRGB.
+  const r = parseInt(hex.slice(1, 3), 16) / 255
+  const g = parseInt(hex.slice(3, 5), 16) / 255
+  const b = parseInt(hex.slice(5, 7), 16) / 255
+  return `color(display-p3 ${r.toFixed(4)} ${g.toFixed(4)} ${b.toFixed(4)})`
+}
+
+const FORMAT_COMPAT: Record<string, string | null> = {
+  css: null,
+  oklch: 'Chrome 111+, Firefox 113+, Safari 15.4+',
+  p3: 'Chrome 111+, Firefox 113+, Safari 10.1+',
+  json: null,
+  tailwind: null,
+}
+
 function ExportModal({ entries, onClose }: { entries: ExportEntry[]; onClose: () => void }) {
-  const [format, setFormat] = useState<'css' | 'json' | 'tailwind'>('css')
+  const [format, setFormat] = useState<'css' | 'oklch' | 'p3' | 'json' | 'tailwind'>('css')
 
   const cssOutput = `:root {\n${entries.map(({ name, shades }) =>
     `  /* ${name} */\n` + shades.map(s => `  --${slugify(name)}-${s.index}: ${s.hex};`).join('\n')
+  ).join('\n\n')}\n}`
+
+  const oklchOutput = `:root {\n${entries.map(({ name, shades }) =>
+    `  /* ${name} */\n` + shades.map(s => `  --${slugify(name)}-${s.index}: ${toOklchCss(s.hex)};`).join('\n')
+  ).join('\n\n')}\n}`
+
+  const p3Output = `:root {\n${entries.map(({ name, shades }) =>
+    `  /* ${name} */\n` + shades.map(s => `  --${slugify(name)}-${s.index}: ${toP3Css(s.hex)};`).join('\n')
   ).join('\n\n')}\n}`
 
   const jsonOutput = JSON.stringify(
@@ -63,7 +94,8 @@ function ExportModal({ entries, onClose }: { entries: ExportEntry[]; onClose: ()
     ])),
   }, null, 2)
 
-  const output = { css: cssOutput, json: jsonOutput, tailwind: twOutput }[format]
+  const output = { css: cssOutput, oklch: oklchOutput, p3: p3Output, json: jsonOutput, tailwind: twOutput }[format]
+  const compatNote = FORMAT_COMPAT[format]
 
   return (
     <div
@@ -84,8 +116,8 @@ function ExportModal({ entries, onClose }: { entries: ExportEntry[]; onClose: ()
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: 'var(--text-muted)', lineHeight: 1 }}>×</button>
         </div>
 
-        <div style={{ display: 'flex', gap: 7, marginBottom: 14 }}>
-          {(['css', 'json', 'tailwind'] as const).map(f => (
+        <div style={{ display: 'flex', gap: 7, marginBottom: compatNote ? 8 : 14, flexWrap: 'wrap' }}>
+          {(['css', 'oklch', 'p3', 'json', 'tailwind'] as const).map(f => (
             <button key={f} onClick={() => setFormat(f)} style={{
               padding: '5px 13px', borderRadius: 7, border: '1px solid var(--border)',
               background: format === f ? 'var(--accent)' : 'var(--surface)',
@@ -96,6 +128,12 @@ function ExportModal({ entries, onClose }: { entries: ExportEntry[]; onClose: ()
             </button>
           ))}
         </div>
+
+        {compatNote && (
+          <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '0 0 10px', lineHeight: 1.5 }}>
+            Browser support: {compatNote}
+          </p>
+        )}
 
         <pre style={{
           background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10,
