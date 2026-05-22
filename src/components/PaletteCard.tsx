@@ -3,6 +3,7 @@ import type { PaletteConfig, GlobalSettings } from '../types'
 import { generatePalette, wcagLevel, apcaContrast, apcaLevel } from '../utils/color'
 import type { ColorShade } from '../utils/color'
 import { Slider } from './Slider'
+import { UIPreview } from './UIPreview'
 
 const PRESETS = ['#3b82f6', '#8b5cf6', '#f43f5e', '#f59e0b', '#10b981', '#06b6d4', '#64748b']
 
@@ -108,7 +109,9 @@ interface Props {
 }
 
 export function PaletteCard({ config, globalSettings, onChange, onDelete, onExport, onAddNeutral, canDelete }: Props) {
+  const [showPreview, setShowPreview] = useState(false)
   const [tintRatio, setTintRatio] = useState(0.10)
+
   const palette = useMemo(() => generatePalette({
     colorMode: globalSettings.colorMode,
     useBaseColor: config.useBaseColor,
@@ -184,6 +187,12 @@ export function PaletteCard({ config, globalSettings, onChange, onDelete, onExpo
             </button>
           </div>
         )}
+        <button
+          onClick={() => setShowPreview(v => !v)}
+          style={{ background: showPreview ? 'var(--surface-raised)' : 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}
+        >
+          Preview
+        </button>
         <button onClick={onExport} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
           Export
         </button>
@@ -261,6 +270,9 @@ export function PaletteCard({ config, globalSettings, onChange, onDelete, onExpo
           />
         ))}
       </div>
+
+      {/* ── UI Preview ── */}
+      {showPreview && <UIPreview shades={palette} name={config.name} />}
     </div>
   )
 }
