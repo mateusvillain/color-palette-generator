@@ -127,6 +127,33 @@ Where L is the relative luminance of each color, calculated from linearized sRGB
 
 Badges in each shade cell show the ratio and WCAG level against both contrast reference colors simultaneously.
 
+### APCA (Advanced Perceptual Contrast Algorithm)
+
+WCAG 2.1 has documented failures — it overestimates contrast for large text and underestimates it for small text at similar luminance. APCA is the proposed replacement in WCAG 3.0.
+
+The tool supports both formulas, selectable in the sidebar. APCA returns a signed **Lc value**: positive = dark text on light background, negative = light text on dark background.
+
+**Implemented formula:** APCA-W3 0.0.98G (Myndex Research)
+
+```
+yText = softClamp(relativeLuminance(text))
+yBg   = softClamp(relativeLuminance(bg))
+
+Lc = (yBg >= yText)
+  ? (yBg^0.56 − yText^0.57) × 1.14     // dark-on-light
+  : (yBg^0.65 − yText^0.62) × 1.14     // light-on-dark
+```
+
+**APCA level thresholds:**
+
+| Lc | Use case |
+|----|----------|
+| 90+ | Body text, small text (< 14px) |
+| 75+ | Large text, subheadings |
+| 60+ | UI components, placeholders, disabled states |
+| 45+ | Non-text elements, decorative |
+| < 45 | Fail — insufficient for any purpose |
+
 ---
 
 ## Architecture
@@ -134,6 +161,7 @@ Badges in each shade cell show the ratio and WCAG level against both contrast re
 ```
 GlobalSettings          — shared across all palettes
   colorMode             LCH or OKLCH
+  contrastMode          wcag or apca (default: wcag)
   shadeCount            number of shades (default: 6)
   lightnessMin/Max      lightness range (default: 8–97)
   hueShift              hue rotation across scale (default: 10°)
