@@ -1,10 +1,18 @@
 import { useMemo, useState } from 'react'
 import type { PaletteConfig, GlobalSettings } from '../types'
-import { generatePalette, wcagLevel } from '../utils/color'
+import { generatePalette, wcagLevel, relativeLuminance } from '../utils/color'
 import type { ColorShade } from '../utils/color'
 import { simulateCVD } from '../utils/colorblind'
 import type { ColorblindMode } from '../utils/colorblind'
 import { Slider } from './Slider'
+
+// Flag adjacent shade pairs whose simulated luminance difference is negligible
+function hasPoorCvdContrast(hexA: string, hexB: string): boolean {
+  const la = relativeLuminance(hexA)
+  const lb = relativeLuminance(hexB)
+  const ratio = (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
+  return ratio < 1.5
+}
 
 const PRESETS = ['#3b82f6', '#8b5cf6', '#f43f5e', '#f59e0b', '#10b981', '#06b6d4', '#64748b']
 
@@ -246,6 +254,36 @@ export function PaletteCard({ config, globalSettings, onChange, onDelete, onExpo
           />
         ))}
       </div>
+
+      {/* ── CVD comparison strip ── */}
+      {cvdMode !== 'normal' && (() => {
+        const simHexes = palette.map(s => simulateCVD(s.hex, cvdMode))
+        return (
+          <div style={{ borderTop: '1px solid var(--border)' }}>
+            <div style={{ padding: '4px 14px 2px', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.7 }}>
+                Original
+              </span>
+            </div>
+            <div style={{ display: 'flex', height: 28 }}>
+              {palette.map((shade, i) => {
+                const poor = i < palette.length - 1 && hasPoorCvdContrast(simHexes[i], simHexes[i + 1])
+                return (
+                  <div key={shade.index} style={{ flex: 1, background: shade.hex, position: 'relative' }}>
+                    {poor && (
+                      <div title="Low contrast with next shade under this CVD mode" style={{
+                        position: 'absolute', top: 4, right: 2,
+                        width: 6, height: 6, borderRadius: '50%', background: '#f87171',
+                        border: '1px solid rgba(255,255,255,0.6)',
+                      }} />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
