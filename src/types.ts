@@ -2,8 +2,11 @@ import type { ColorMode, CurveType } from './utils/color'
 
 export type { ColorMode }
 
+export type HarmonyMode = 'none' | 'complementary' | 'analogous' | 'triadic' | 'split-complementary'
+
 export interface GlobalSettings {
   colorMode: ColorMode
+  harmonyMode: HarmonyMode
   shadeCount: number
   hueShift: number
   chromaScale: number
@@ -26,6 +29,7 @@ export interface PaletteConfig {
 export function createDefaultSettings(): GlobalSettings {
   return {
     colorMode: 'oklch',
+    harmonyMode: 'none',
     shadeCount: 6,
     hueShift: 10,
     chromaScale: 1.0,
