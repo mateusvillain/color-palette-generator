@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import type { PaletteConfig, GlobalSettings } from './types'
-import { createDefaultPalette, createDefaultSettings } from './types'
+import type { HarmonyMode } from './types'
+import { createDefaultPalette } from './types'
 import { generatePalette, hexToColorLCH } from './utils/color'
 import type { ColorShade, ColorMode } from './utils/color'
+import { deriveHarmonyHues } from './utils/harmony'
 import { PaletteCard } from './components/PaletteCard'
 import { Slider } from './components/Slider'
 import { ColorInput } from './components/ColorInput'
 import { CurvePicker } from './components/CurvePicker'
+import { useUrlState } from './hooks/useUrlState'
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -128,18 +131,104 @@ function SidebarSection({ title, children }: { title: string; children: React.Re
   )
 }
 
+// ── Hue Wheel ─────────────────────────────────────────────
+
+const HARMONY_LABELS: Record<HarmonyMode, string> = {
+  'none': 'None',
+  'complementary': 'Compl.',
+  'analogous': 'Analog.',
+  'triadic': 'Triadic',
+  'split-complementary': 'Split',
+}
+
+function HueWheel({ palettes, colorMode }: { palettes: PaletteConfig[]; colorMode: GlobalSettings['colorMode'] }) {
+  const size = 72
+  const center = size / 2
+  const trackR = 28
+  const dotR = 5
+
+  const hues = palettes.map(p => {
+    if (p.useBaseColor) return hexToColorLCH(p.baseColor, colorMode).h
+    return p.manualHue
+  })
+
+  const colors = palettes.map(p => p.useBaseColor ? p.baseColor : `hsl(${p.manualHue}, 65%, 55%)`)
+
+  return (
+    <svg width={size} height={size} style={{ display: 'block', flexShrink: 0 }}>
+      {/* Gradient ring */}
+      <defs>
+        <linearGradient id="hue-grad-r" x1="1" y1="0" x2="0" y2="0">
+          <stop offset="0%" stopColor="hsl(0,80%,55%)" />
+          <stop offset="100%" stopColor="hsl(60,80%,55%)" />
+        </linearGradient>
+        <linearGradient id="hue-grad-b" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="hsl(60,80%,55%)" />
+          <stop offset="100%" stopColor="hsl(180,80%,45%)" />
+        </linearGradient>
+        <linearGradient id="hue-grad-l" x1="0" y1="1" x2="1" y2="1">
+          <stop offset="0%" stopColor="hsl(180,80%,45%)" />
+          <stop offset="100%" stopColor="hsl(300,80%,55%)" />
+        </linearGradient>
+        <linearGradient id="hue-grad-t" x1="1" y1="1" x2="1" y2="0">
+          <stop offset="0%" stopColor="hsl(300,80%,55%)" />
+          <stop offset="100%" stopColor="hsl(360,80%,55%)" />
+        </linearGradient>
+      </defs>
+      {/* Track ring */}
+      <circle cx={center} cy={center} r={trackR} fill="none" stroke="url(#hue-grad-r)" strokeWidth={6} strokeDasharray={`${Math.PI * trackR / 2} ${Math.PI * trackR * 1.5}`} strokeDashoffset={0} />
+      <circle cx={center} cy={center} r={trackR} fill="none" stroke="url(#hue-grad-b)" strokeWidth={6} strokeDasharray={`${Math.PI * trackR / 2} ${Math.PI * trackR * 1.5}`} strokeDashoffset={`${-Math.PI * trackR / 2}`} />
+      <circle cx={center} cy={center} r={trackR} fill="none" stroke="url(#hue-grad-l)" strokeWidth={6} strokeDasharray={`${Math.PI * trackR / 2} ${Math.PI * trackR * 1.5}`} strokeDashoffset={`${-Math.PI * trackR}`} />
+      <circle cx={center} cy={center} r={trackR} fill="none" stroke="url(#hue-grad-t)" strokeWidth={6} strokeDasharray={`${Math.PI * trackR / 2} ${Math.PI * trackR * 1.5}`} strokeDashoffset={`${-Math.PI * trackR * 1.5}`} />
+      {/* Hue dots */}
+      {hues.map((hue, i) => {
+        const angle = (hue - 90) * Math.PI / 180
+        const x = center + trackR * Math.cos(angle)
+        const y = center + trackR * Math.sin(angle)
+        return (
+          <g key={i}>
+            <circle cx={x} cy={y} r={dotR + 1.5} fill="var(--bg)" />
+            <circle cx={x} cy={y} r={dotR} fill={colors[i]} />
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
 // ── App ───────────────────────────────────────────────────
 
 export default function App() {
-  const [palettes, setPalettes] = useState<PaletteConfig[]>([createDefaultPalette('Primary')])
-  const [settings, setSettings] = useState<GlobalSettings>(createDefaultSettings())
+  const { settings, palettes, setSettings, setPalettes } = useUrlState()
   const [darkMode, setDarkMode] = useState(false)
   const [exportEntries, setExportEntries] = useState<ExportEntry[] | null>(null)
 
   const patchSettings = (updates: Partial<GlobalSettings>) =>
     setSettings(s => ({ ...s, ...updates }))
 
-  const addPalette = () => setPalettes(prev => [...prev, createDefaultPalette()])
+  const addPalette = () => setPalettes(prev => {
+    if (settings.harmonyMode !== 'none' && prev.length > 0) {
+      const base = prev[0]
+      const baseHex = base.useBaseColor ? base.baseColor : '#3b82f6'
+      const hues = deriveHarmonyHues(baseHex, settings.harmonyMode, settings.colorMode)
+      const slotIndex = prev.length - 1  // palette index relative to base
+      const hue = hues[slotIndex % hues.length]
+      const baseChroma = base.useBaseColor
+        ? hexToColorLCH(baseHex, settings.colorMode).c
+        : base.manualChroma
+      const normalizedChroma = settings.colorMode === 'oklch' ? baseChroma / 0.004 : baseChroma
+      const newPalette: PaletteConfig = {
+        id: crypto.randomUUID(),
+        name: `Palette ${prev.length + 1}`,
+        useBaseColor: false,
+        baseColor: base.baseColor,
+        manualHue: Math.round(hue),
+        manualChroma: Math.min(100, Math.round(normalizedChroma)),
+      }
+      return [...prev, newPalette]
+    }
+    return [...prev, createDefaultPalette()]
+  })
   const removePalette = (id: string) => setPalettes(prev => prev.filter(p => p.id !== id))
   const updatePalette = (id: string, updates: Partial<PaletteConfig>) =>
     setPalettes(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
@@ -181,6 +270,12 @@ export default function App() {
         </div>
 
         <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+          <button
+            onClick={() => navigator.clipboard.writeText(window.location.href)}
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 7, padding: '5px 13px', cursor: 'pointer', fontSize: 12, color: 'var(--text)', fontWeight: 600 }}
+          >
+            Copy link
+          </button>
           <button
             onClick={addPalette}
             style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 7, padding: '5px 13px', cursor: 'pointer', fontSize: 12, color: 'var(--text)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}
@@ -238,6 +333,40 @@ export default function App() {
             </p>
           </SidebarSection>
 
+          <SidebarSection title="Color Harmony">
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {(Object.keys(HARMONY_LABELS) as HarmonyMode[]).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => patchSettings({ harmonyMode: mode })}
+                  style={{
+                    padding: '5px 9px', borderRadius: 7, fontSize: 10, fontWeight: 700,
+                    border: `1.5px solid ${settings.harmonyMode === mode ? 'var(--accent)' : 'var(--border)'}`,
+                    background: settings.harmonyMode === mode ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'var(--bg)',
+                    color: settings.harmonyMode === mode ? 'var(--accent)' : 'var(--text-secondary)',
+                    cursor: 'pointer', letterSpacing: 0.3, fontFamily: 'inherit',
+                    transition: 'border-color 0.15s, background 0.15s, color 0.15s',
+                  }}
+                >
+                  {HARMONY_LABELS[mode]}
+                </button>
+              ))}
+            </div>
+            {settings.harmonyMode !== 'none' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <HueWheel palettes={palettes} colorMode={settings.colorMode} />
+                <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: 0, lineHeight: 1.55 }}>
+                  New palettes are seeded with harmonically related hues. Use the Hue slider to override.
+                </p>
+              </div>
+            )}
+            {settings.harmonyMode === 'none' && (
+              <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
+                Auto-seed new palettes with harmonically related hues from the first palette.
+              </p>
+            )}
+          </SidebarSection>
+
           <SidebarSection title="Shades">
             <Slider label="Count" value={settings.shadeCount} min={3} max={20} onChange={v => patchSettings({ shadeCount: v })} />
             <Slider label="Min Lightness" value={settings.lightnessMin} min={2} max={40} unit="%" onChange={v => patchSettings({ lightnessMin: v })} />
@@ -258,13 +387,46 @@ export default function App() {
             <ColorInput label="Dark" value={settings.darkContrastColor} onChange={v => patchSettings({ darkContrastColor: v })} />
           </SidebarSection>
 
-          <SidebarSection title="WCAG Levels">
-            {[
+          <SidebarSection title="Contrast Formula">
+            <div style={{ display: 'flex', gap: 6 }}>
+              {(['wcag', 'apca'] as const).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => patchSettings({ contrastMode: mode })}
+                  style={{
+                    flex: 1, padding: '7px 0', borderRadius: 8,
+                    border: `1.5px solid ${settings.contrastMode === mode ? 'var(--accent)' : 'var(--border)'}`,
+                    background: settings.contrastMode === mode ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'var(--bg)',
+                    color: settings.contrastMode === mode ? 'var(--accent)' : 'var(--text-secondary)',
+                    fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                    fontFamily: 'JetBrains Mono, monospace', letterSpacing: 0.5,
+                    transition: 'border-color 0.15s, background 0.15s, color 0.15s',
+                  }}
+                >
+                  {mode.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
+              {settings.contrastMode === 'apca'
+                ? 'APCA (WCAG 3 candidate). More accurate for real-world readability.'
+                : 'WCAG 2.1 standard. Widely required for compliance.'}
+            </p>
+          </SidebarSection>
+
+          <SidebarSection title={settings.contrastMode === 'apca' ? 'APCA Levels' : 'WCAG Levels'}>
+            {(settings.contrastMode === 'apca' ? [
+              { level: 'Lc90+', ratio: 'Body text',     color: '#4ade80' },
+              { level: 'Lc75+', ratio: 'Large text',    color: '#60a5fa' },
+              { level: 'Lc60+', ratio: 'UI components', color: '#fbbf24' },
+              { level: 'Lc45+', ratio: 'Non-text',      color: '#f97316' },
+              { level: 'Fail',  ratio: '< Lc45',        color: '#f87171' },
+            ] : [
               { level: 'AAA',      ratio: '≥ 7 : 1',   color: '#4ade80' },
               { level: 'AA',       ratio: '≥ 4.5 : 1', color: '#60a5fa' },
               { level: 'AA Large', ratio: '≥ 3 : 1',   color: '#fbbf24' },
               { level: 'Fail',     ratio: '< 3 : 1',   color: '#f87171' },
-            ].map(({ level, ratio, color }) => (
+            ]).map(({ level, ratio, color }) => (
               <div key={level} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
                 <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>{level}</span>

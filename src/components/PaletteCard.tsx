@@ -1,24 +1,47 @@
 import { useMemo, useState } from 'react'
 import type { PaletteConfig, GlobalSettings } from '../types'
-import { generatePalette, wcagLevel } from '../utils/color'
+import { generatePalette, wcagLevel, apcaContrast, apcaLevel } from '../utils/color'
 import type { ColorShade } from '../utils/color'
 import { Slider } from './Slider'
 
 const PRESETS = ['#3b82f6', '#8b5cf6', '#f43f5e', '#f59e0b', '#10b981', '#06b6d4', '#64748b']
 
-const LEVEL_COLOR: Record<string, string> = {
+const WCAG_LEVEL_COLOR: Record<string, string> = {
   AAA: '#4ade80',
   AA: '#60a5fa',
   'AA Large': '#fbbf24',
   Fail: '#f87171',
 }
 
-function ShadeCell({ shade, lightContrastColor, darkContrastColor }: {
+const APCA_LEVEL_COLOR: Record<string, string> = {
+  'Lc90+': '#4ade80',
+  'Lc75+': '#60a5fa',
+  'Lc60+': '#fbbf24',
+  'Lc45+': '#f97316',
+  Fail: '#f87171',
+}
+
+function ShadeCell({ shade, lightContrastColor, darkContrastColor, contrastMode }: {
   shade: ColorShade
   lightContrastColor: string
   darkContrastColor: string
+  contrastMode: 'wcag' | 'apca'
 }) {
   const textColor = shade.contrastLight >= shade.contrastDark ? lightContrastColor : darkContrastColor
+
+  const badges = contrastMode === 'apca'
+    ? [
+        { value: apcaContrast(textColor === lightContrastColor ? lightContrastColor : darkContrastColor, shade.hex), bg: lightContrastColor },
+        { value: apcaContrast(textColor === lightContrastColor ? lightContrastColor : darkContrastColor, shade.hex), bg: darkContrastColor },
+      ].map((_, i) => {
+        const bg = i === 0 ? lightContrastColor : darkContrastColor
+        const lc = apcaContrast(shade.hex, bg)
+        return { label: Math.abs(lc).toFixed(0), dotColor: APCA_LEVEL_COLOR[apcaLevel(lc)], bg }
+      })
+    : [
+        { label: shade.contrastLight.toFixed(1), dotColor: WCAG_LEVEL_COLOR[wcagLevel(shade.contrastLight)], bg: lightContrastColor },
+        { label: shade.contrastDark.toFixed(1),  dotColor: WCAG_LEVEL_COLOR[wcagLevel(shade.contrastDark)],  bg: darkContrastColor },
+      ]
 
   return (
     <div
@@ -41,15 +64,12 @@ function ShadeCell({ shade, lightContrastColor, darkContrastColor }: {
       </span>
       {/* Contrast badges — horizontal */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', overflow: 'hidden', padding: '0 4px' }}>
-        {[
-          { cr: shade.contrastLight, bg: lightContrastColor },
-          { cr: shade.contrastDark, bg: darkContrastColor },
-        ].map(({ cr, bg }, i) => (
+        {badges.map(({ label, dotColor, bg }, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
             <div style={{ width: 6, height: 6, borderRadius: 2, background: bg, border: '0.5px solid rgba(128,128,128,0.35)', flexShrink: 0 }} />
-            <div style={{ width: 5, height: 5, borderRadius: '50%', background: LEVEL_COLOR[wcagLevel(cr)], flexShrink: 0 }} />
+            <div style={{ width: 5, height: 5, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
             <span style={{ color: textColor, fontSize: 10, fontFamily: 'JetBrains Mono, monospace', opacity: 0.9, whiteSpace: 'nowrap' }}>
-              {cr.toFixed(1)}
+              {label}
             </span>
           </div>
         ))}
@@ -237,6 +257,7 @@ export function PaletteCard({ config, globalSettings, onChange, onDelete, onExpo
             shade={shade}
             lightContrastColor={globalSettings.lightContrastColor}
             darkContrastColor={globalSettings.darkContrastColor}
+            contrastMode={globalSettings.contrastMode}
           />
         ))}
       </div>
