@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { PaletteConfig, GlobalSettings } from './types'
 import { createDefaultPalette, createDefaultSettings } from './types'
-import { generatePalette } from './utils/color'
+import { generatePalette, hexToColorLCH } from './utils/color'
 import type { ColorShade } from './utils/color'
 import { PaletteCard } from './components/PaletteCard'
 import { Slider } from './components/Slider'
@@ -38,11 +38,20 @@ function buildExportEntry(config: PaletteConfig, s: GlobalSettings): ExportEntry
 
 // ── Export Modal ──────────────────────────────────────────
 
+function toOklchCss(hex: string): string {
+  const { l, c, h } = hexToColorLCH(hex, 'oklch')
+  return `oklch(${(l / 100).toFixed(4)} ${(c).toFixed(4)} ${h.toFixed(2)})`
+}
+
 function ExportModal({ entries, onClose }: { entries: ExportEntry[]; onClose: () => void }) {
-  const [format, setFormat] = useState<'css' | 'json' | 'tailwind'>('css')
+  const [format, setFormat] = useState<'css' | 'json' | 'tailwind' | 'oklch'>('css')
 
   const cssOutput = `:root {\n${entries.map(({ name, shades }) =>
     `  /* ${name} */\n` + shades.map(s => `  --${slugify(name)}-${s.index}: ${s.hex};`).join('\n')
+  ).join('\n\n')}\n}`
+
+  const oklchOutput = `:root {\n${entries.map(({ name, shades }) =>
+    `  /* ${name} */\n` + shades.map(s => `  --${slugify(name)}-${s.index}: ${toOklchCss(s.hex)};`).join('\n')
   ).join('\n\n')}\n}`
 
   const jsonOutput = JSON.stringify(
@@ -60,7 +69,7 @@ function ExportModal({ entries, onClose }: { entries: ExportEntry[]; onClose: ()
     ])),
   }, null, 2)
 
-  const output = { css: cssOutput, json: jsonOutput, tailwind: twOutput }[format]
+  const output = { css: cssOutput, oklch: oklchOutput, json: jsonOutput, tailwind: twOutput }[format]
 
   return (
     <div
@@ -82,7 +91,7 @@ function ExportModal({ entries, onClose }: { entries: ExportEntry[]; onClose: ()
         </div>
 
         <div style={{ display: 'flex', gap: 7, marginBottom: 14 }}>
-          {(['css', 'json', 'tailwind'] as const).map(f => (
+          {(['css', 'oklch', 'json', 'tailwind'] as const).map(f => (
             <button key={f} onClick={() => setFormat(f)} style={{
               padding: '5px 13px', borderRadius: 7, border: '1px solid var(--border)',
               background: format === f ? 'var(--accent)' : 'var(--surface)',
