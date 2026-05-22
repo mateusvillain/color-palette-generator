@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { PaletteConfig, GlobalSettings } from '../types'
 import { generatePalette, wcagLevel, apcaContrast, apcaLevel } from '../utils/color'
 import type { ColorShade } from '../utils/color'
@@ -103,10 +103,12 @@ interface Props {
   onChange: (updates: Partial<PaletteConfig>) => void
   onDelete: () => void
   onExport: () => void
+  onAddNeutral: (tintRatio: number) => void
   canDelete: boolean
 }
 
-export function PaletteCard({ config, globalSettings, onChange, onDelete, onExport, canDelete }: Props) {
+export function PaletteCard({ config, globalSettings, onChange, onDelete, onExport, onAddNeutral, canDelete }: Props) {
+  const [tintRatio, setTintRatio] = useState(0.10)
   const palette = useMemo(() => generatePalette({
     colorMode: globalSettings.colorMode,
     useBaseColor: config.useBaseColor,
@@ -136,6 +138,7 @@ export function PaletteCard({ config, globalSettings, onChange, onDelete, onExpo
       borderRadius: 12,
       overflow: 'hidden',
       borderTop: `3px solid ${midShade?.hex ?? 'var(--accent)'}`,
+      opacity: config.isNeutral ? 0.92 : 1,
     }}>
       {/* ── Card Header ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px' }}>
@@ -156,8 +159,31 @@ export function PaletteCard({ config, globalSettings, onChange, onDelete, onExpo
           onBlur={e => (e.currentTarget.style.background = 'none')}
         />
 
+        {config.isNeutral && (
+          <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 5px', letterSpacing: 0.5, textTransform: 'uppercase', flexShrink: 0 }}>
+            Neutral
+          </span>
+        )}
+
         <div style={{ flex: 1 }} />
 
+        {config.useBaseColor && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>Tint</span>
+              <input
+                type="range"
+                min={0} max={0.25} step={0.01}
+                value={tintRatio}
+                onChange={e => setTintRatio(parseFloat(e.target.value))}
+                style={{ width: 52, height: 4, accentColor: 'var(--accent)' }}
+              />
+            </div>
+            <button onClick={() => onAddNeutral(tintRatio)} title="Add tinted neutral derived from this color" style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+              + Neutral
+            </button>
+          </div>
+        )}
         <button onClick={onExport} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
           Export
         </button>

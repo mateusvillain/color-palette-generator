@@ -3,7 +3,7 @@ import type { PaletteConfig, GlobalSettings } from './types'
 import type { HarmonyMode } from './types'
 import { createDefaultPalette } from './types'
 import { generatePalette, hexToColorLCH } from './utils/color'
-import type { ColorShade } from './utils/color'
+import type { ColorShade, ColorMode } from './utils/color'
 import { deriveHarmonyHues } from './utils/harmony'
 import { PaletteCard } from './components/PaletteCard'
 import { Slider } from './components/Slider'
@@ -233,6 +233,23 @@ export default function App() {
   const updatePalette = (id: string, updates: Partial<PaletteConfig>) =>
     setPalettes(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
 
+  const addNeutral = (source: PaletteConfig, tintRatio: number) => {
+    const OKLCH_C_SCALE = 0.004
+    const { h, c } = hexToColorLCH(source.baseColor, settings.colorMode as ColorMode)
+    const cNorm = settings.colorMode === 'oklch'
+      ? (c / OKLCH_C_SCALE) * tintRatio
+      : c * tintRatio
+    setPalettes(prev => [...prev, {
+      id: crypto.randomUUID(),
+      name: `${source.name} Neutral`,
+      useBaseColor: false,
+      baseColor: source.baseColor,
+      manualHue: h,
+      manualChroma: Math.min(cNorm, 12),
+      isNeutral: true,
+    }])
+  }
+
   return (
     <div data-theme={darkMode ? 'dark' : 'light'} style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)' }}>
 
@@ -429,6 +446,7 @@ export default function App() {
               onChange={updates => updatePalette(palette.id, updates)}
               onDelete={() => removePalette(palette.id)}
               onExport={() => setExportEntries([buildExportEntry(palette, settings)])}
+              onAddNeutral={(tint) => addNeutral(palette, tint)}
               canDelete={palettes.length > 1}
             />
           ))}
