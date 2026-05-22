@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { PaletteConfig, GlobalSettings } from './types'
 import type { HarmonyMode } from './types'
-import { createDefaultPalette, createDefaultSettings } from './types'
+import { createDefaultPalette } from './types'
 import { generatePalette, hexToColorLCH } from './utils/color'
 import type { ColorShade } from './utils/color'
 import { deriveHarmonyHues } from './utils/harmony'
@@ -9,6 +9,7 @@ import { PaletteCard } from './components/PaletteCard'
 import { Slider } from './components/Slider'
 import { ColorInput } from './components/ColorInput'
 import { CurvePicker } from './components/CurvePicker'
+import { useUrlState } from './hooks/useUrlState'
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -198,8 +199,7 @@ function HueWheel({ palettes, colorMode }: { palettes: PaletteConfig[]; colorMod
 // ── App ───────────────────────────────────────────────────
 
 export default function App() {
-  const [palettes, setPalettes] = useState<PaletteConfig[]>([createDefaultPalette('Primary')])
-  const [settings, setSettings] = useState<GlobalSettings>(createDefaultSettings())
+  const { settings, palettes, setSettings, setPalettes } = useUrlState()
   const [darkMode, setDarkMode] = useState(false)
   const [exportEntries, setExportEntries] = useState<ExportEntry[] | null>(null)
 
@@ -253,6 +253,12 @@ export default function App() {
         </div>
 
         <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+          <button
+            onClick={() => navigator.clipboard.writeText(window.location.href)}
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 7, padding: '5px 13px', cursor: 'pointer', fontSize: 12, color: 'var(--text)', fontWeight: 600 }}
+          >
+            Copy link
+          </button>
           <button
             onClick={addPalette}
             style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 7, padding: '5px 13px', cursor: 'pointer', fontSize: 12, color: 'var(--text)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}
